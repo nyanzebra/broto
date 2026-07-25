@@ -79,7 +79,7 @@ fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
 
     if is_async {
         quote! {
-            impl #impl_generics Encode for #name #ty_generics #where_clause {
+            impl #impl_generics #krate::Encode for #name #ty_generics #where_clause {
                 async fn encode<W>(&self, writer: &mut W) -> #krate::Result<usize>
                 where
                     W: #krate::AsyncWrite + Unpin,
@@ -90,7 +90,7 @@ fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
         }
     } else {
         quote! {
-            impl #impl_generics Encode for #name #ty_generics #where_clause {
+            impl #impl_generics #krate::Encode for #name #ty_generics #where_clause {
                 fn encode<W>(&self, writer: &mut W) -> #krate::Result<usize>
                 where
                     W: ::std::io::Write,
@@ -152,7 +152,7 @@ fn build_decode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
 
     if is_async {
         quote! {
-            impl #impl_generics Decode for #name #ty_generics #where_clause {
+            impl #impl_generics #krate::Decode for #name #ty_generics #where_clause {
                 async fn decode<R>(reader: &mut R) -> #krate::Result<Self>
                 where
                     Self: Sized,
@@ -164,7 +164,7 @@ fn build_decode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
         }
     } else {
         quote! {
-            impl #impl_generics Decode for #name #ty_generics #where_clause {
+            impl #impl_generics #krate::Decode for #name #ty_generics #where_clause {
                 fn decode<R>(reader: &mut R) -> #krate::Result<Self>
                 where
                     Self: Sized,
