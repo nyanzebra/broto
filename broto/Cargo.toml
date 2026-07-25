@@ -1,0 +1,27 @@
+[package]
+name = "broto"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[features]
+default = ["sync"]
+sync =[]
+async=["dep:futures-io","dep:futures-util"]
+
+[dependencies]
+broto-derive = {path="../broto-derive"}
+futures-io = { workspace=true, optional = true }
+futures-util = { workspace=true, optional = true, features = ["io"] }
+thiserror = { workspace=true }
+
+[dev-dependencies]
+futures = "0.3"
+
+[[example]]
+name = "sync"
+required-features = ["sync"]
+
+[[example]]
+name = "async"
+required-features = ["async"]
