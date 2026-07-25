@@ -3,38 +3,35 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{Data, DeriveInput, parse_macro_input};
 
-fn broto_crate() -> TokenStream2 {
-    if std::env::var("CARGO_CRATE_NAME").as_deref() == Ok("broto") {
-        quote! { crate }
-    } else {
-        quote! { ::broto }
-    }
-}
-
-fn await_tok(is_async: bool) -> TokenStream2 {
-    if is_async {
-        quote! { .await }
-    } else {
-        quote! {}
-    }
-}
+#[cfg(all(feature = "async", feature = "sync"))]
+compile_error!("broto-derive features `async` and `sync` are mutually exclusive");
+#[cfg(not(any(feature = "async", feature = "sync")))]
+compile_error!("enable exactly one of `broto-derive`'s `sync` or `async` features");
 
 #[proc_macro_derive(Encode)]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let krate = broto_crate();
 
-    let async_impl = build_encode_impl(&input, &krate, true);
-    let sync_impl = build_encode_impl(&input, &krate, false);
+    #[cfg(feature = "async")]
+    let is_async = true;
+    #[cfg(feature = "sync")]
+    let is_async = false;
 
-    quote! {
-        #[cfg(feature = "async")]
-        #async_impl
+    build_encode_impl(&input, &krate, is_async).into()
+}
 
-        #[cfg(feature = "sync")]
-        #sync_impl
-    }
-    .into()
+#[proc_macro_derive(Decode)]
+pub fn derive_decode(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let krate = broto_crate();
+
+    #[cfg(feature = "async")]
+    let is_async = true;
+    #[cfg(feature = "sync")]
+    let is_async = false;
+
+    build_decode_impl(&input, &krate, is_async).into()
 }
 
 fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) -> TokenStream2 {
@@ -103,24 +100,6 @@ fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
             }
         }
     }
-}
-
-#[proc_macro_derive(Decode)]
-pub fn derive_decode(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let krate = broto_crate();
-
-    let async_impl = build_decode_impl(&input, &krate, true);
-    let sync_impl = build_decode_impl(&input, &krate, false);
-
-    quote! {
-        #[cfg(feature = "async")]
-        #async_impl
-
-        #[cfg(feature = "sync")]
-        #sync_impl
-    }
-    .into()
 }
 
 fn build_decode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) -> TokenStream2 {
@@ -405,5 +384,21 @@ mod encode {
                 }
             }
         }
+    }
+}
+
+fn broto_crate() -> TokenStream2 {
+    if std::env::var("CARGO_CRATE_NAME").as_deref() == Ok("broto") {
+        quote! { crate }
+    } else {
+        quote! { ::broto }
+    }
+}
+
+fn await_tok(is_async: bool) -> TokenStream2 {
+    if is_async {
+        quote! { .await }
+    } else {
+        quote! {}
     }
 }
