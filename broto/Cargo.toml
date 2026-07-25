@@ -5,7 +5,7 @@ edition.workspace = true
 repository.workspace = true
 
 [features]
-default = ["sync"]
+default = []
 sync =[]
 async=["dep:futures-io","dep:futures-util"]
 
