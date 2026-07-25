@@ -82,7 +82,7 @@ fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
             impl #impl_generics Encode for #name #ty_generics #where_clause {
                 async fn encode<W>(&self, writer: &mut W) -> #krate::Result<usize>
                 where
-                    W: ::futures_io::AsyncWrite + Unpin,
+                    W: #krate::AsyncWrite + Unpin,
                 {
                     #body
                 }
@@ -156,7 +156,7 @@ fn build_decode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
                 async fn decode<R>(reader: &mut R) -> #krate::Result<Self>
                 where
                     Self: Sized,
-                    R: ::futures_io::AsyncRead + Unpin,
+                    R: #krate::AsyncRead + Unpin,
                 {
                     #body
                 }

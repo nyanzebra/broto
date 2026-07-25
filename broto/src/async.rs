@@ -1,6 +1,6 @@
 pub use broto_derive::{Decode, Encode};
 
-use futures_io::{AsyncRead, AsyncWrite};
+pub use futures_io::{AsyncRead, AsyncWrite};
 
 use crate::Result;
 
