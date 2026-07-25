@@ -1,18 +1,14 @@
 name: Rust CI
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
-  build_and_test:
+  fmt:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,19 +16,36 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
+          components: rustfmt
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Lint with Clippy
-        run: cargo clippy -- -D warnings
+  build_and_test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: [sync, async]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build project
-        run: cargo build --verbose
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
-      - name: Run tests
-        run: cargo test --verbose
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.feature }}
+
+      - name: Lint with Clippy (${{ matrix.feature }})
+        run: cargo clippy --workspace --no-default-features --features ${{ matrix.feature }} --all-targets -- -D warnings
+
+      - name: Build project (${{ matrix.feature }})
+        run: cargo build --workspace --verbose --no-default-features --features ${{ matrix.feature }}
+
+      - name: Run tests (${{ matrix.feature }})
+        run: cargo test --workspace --verbose --no-default-features --features ${{ matrix.feature }}
