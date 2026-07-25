@@ -6,8 +6,8 @@ repository.workspace = true
 
 [features]
 default = []
-sync =[]
-async=["dep:futures-io","dep:futures-util"]
+sync = ["broto-derive/sync"]
+async = ["broto-derive/async", "dep:futures-io", "dep:futures-util"]
 
 [dependencies]
 broto-derive = {path="../broto-derive"}
