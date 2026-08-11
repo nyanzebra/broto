@@ -17,8 +17,8 @@ repository = "https://github.com/nyanzebra/broto"
 
 [workspace.dependencies]
 futures-io = { version = "0.3" }
-futures-util = { version = "0.3", default-features = false }
+futures-util = { version = "0.3" }
 proc-macro2 = "1"
 quote = "1"
-syn = { version = "2", features = ["full"] }
+syn = { version = "2" }
 thiserror = "2"
