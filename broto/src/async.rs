@@ -4,13 +4,19 @@ pub use futures_io::{AsyncRead, AsyncWrite};
 
 use crate::Result;
 
+/// Encodes a value to a writer.
 pub trait Encode {
+    /// Encodes the value to the writer.
+    /// Returns the number of bytes written or an [`Error`].
     fn encode<W>(&self, writer: &mut W) -> impl Future<Output = Result<usize>>
     where
         W: AsyncWrite + Unpin;
 }
 
+/// Decodes a value from a reader.
 pub trait Decode {
+    /// Decodes the value from the reader.
+    /// Returns the decoded value or an [`Error`].
     fn decode<R>(reader: &mut R) -> impl Future<Output = Result<Self>>
     where
         Self: Sized,
