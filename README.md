@@ -124,10 +124,32 @@ impl Decode for Shape {
             other => {
                 Err(::broto::Error::InvalidDiscriminant {
                     got: other,
-                    max: 4usize,
+                    max: 3u8,
                 })
             }
         }
     }
 }
 ```
+
+# Custom discriminants: `#[tag(N)]`
+By default, each enum variant's discriminant is just its position in the enum, 0-indexed — that's what the `Shape` example above shows: `Circle` is `0`, `Rectangle` is `1`, `Point` is `2`, `Empty` is `3`.
+
+If you need explicit control over the discriminant instead — interop with another wire format's existing values, keeping a variant's byte value stable even if you reorder or insert variants later, reserving specific values, etc. — tag a variant directly:
+```rust
+#[derive(Debug, PartialEq, Encode, Decode)]
+enum Status {
+    Ok,
+    #[tag(100)]
+    Retry,
+    Failed,
+}
+```
+
+- `Ok` has no `#[tag(...)]`, so it keeps its default: its position, `0`.
+- `Retry` is explicitly `100`.
+- `Failed` has no `#[tag(...)]` either — it still gets *its own* position, `2`, regardless of what `Retry` was tagged. Tags don't shift the numbering for variants that come after them, and untagged variants never need to know or care what nearby variants are tagged.
+
+The discriminant written to the wire for each variant is `u8` (`0..=255`), same as untagged variants always were. Two things are checked at compile time, so a mistake here is a build failure, not something that surfaces later as a decode error:
+- A `#[tag(...)]` value that doesn't fit in a `u8` fails to compile.
+- Two variants ending up with the same discriminant — whether from two explicit tags, or a tag colliding with another variant's default position — fails to compile, naming both variants in the error.

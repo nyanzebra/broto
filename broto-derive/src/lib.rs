@@ -1,14 +1,14 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{Data, DeriveInput, parse_macro_input};
+use syn::{Data, DeriveInput, Variant, parse_macro_input};
 
 #[cfg(all(feature = "async", feature = "sync"))]
 compile_error!("broto-derive features `async` and `sync` are mutually exclusive");
 #[cfg(not(any(feature = "async", feature = "sync")))]
 compile_error!("enable exactly one of `broto-derive`'s `sync` or `async` features");
 
-#[proc_macro_derive(Encode)]
+#[proc_macro_derive(Encode, attributes(tag))]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let krate = broto_crate();
@@ -21,7 +21,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     build_encode_impl(&input, &krate, is_async).into()
 }
 
-#[proc_macro_derive(Decode)]
+#[proc_macro_derive(Decode, attributes(tag))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let krate = broto_crate();
@@ -32,6 +32,52 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     let is_async = false;
 
     build_decode_impl(&input, &krate, is_async).into()
+}
+
+/// Reads `#[tag(N)]` off a variant if present, falling back to
+/// `default_idx` (its declaration position) otherwise. `N` accepts any
+/// valid Rust integer literal syntax (decimal, `0x`, `0o`, `0b`) — syn
+/// normalizes them all before parsing. Panics with a clear message if the
+/// attribute is malformed, or the value doesn't fit in a `u8` (the wire
+/// discriminant type).
+fn variant_discriminant(variant: &Variant, default_idx: usize) -> u8 {
+    for attr in &variant.attrs {
+        if attr.path().is_ident("tag") {
+            let lit: syn::LitInt = attr.parse_args().unwrap_or_else(|e| {
+                panic!("invalid #[tag(...)] on variant '{}': {e}", variant.ident)
+            });
+            return lit.base10_parse::<u8>().unwrap_or_else(|e| {
+                panic!(
+                    "#[tag(...)] on variant '{}' must fit in a u8 (0..=255): {e}",
+                    variant.ident
+                )
+            });
+        }
+    }
+
+    u8::try_from(default_idx).unwrap_or_else(|_| {
+        panic!(
+            "enum has more than 256 variants; discriminants must fit in a u8 \
+             (tag variant '{}' explicitly with #[tag(...)] to work around this)",
+            variant.ident
+        )
+    })
+}
+
+/// Panics if any two variants ended up with the same discriminant — whether
+/// from two explicit `#[tag(...)]`s, or an explicit tag colliding with
+/// another variant's default positional index.
+fn check_unique_discriminants(enum_name: &syn::Ident, variants: &[&Variant], discriminants: &[u8]) {
+    let mut seen: std::collections::HashMap<u8, &syn::Ident> = std::collections::HashMap::new();
+    for (variant, &discriminant) in variants.iter().zip(discriminants) {
+        if let Some(prev) = seen.insert(discriminant, &variant.ident) {
+            panic!(
+                "enum '{enum_name}': variants '{prev}' and '{}' both use discriminant {discriminant} \
+                 — give one of them an explicit #[tag(...)] that doesn't collide",
+                variant.ident
+            );
+        }
+    }
 }
 
 fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) -> TokenStream2 {
@@ -48,16 +94,22 @@ fn build_encode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
             }
         }
         Data::Enum(e) => {
-            let arms: Vec<_> = e
-                .variants
+            let variants: Vec<&Variant> = e.variants.iter().collect();
+            let discriminants: Vec<u8> = variants
                 .iter()
                 .enumerate()
-                .map(|(idx, variant)| {
-                    let discriminant = idx as u8;
-                    let ident = &variant.ident;
+                .map(|(idx, variant)| variant_discriminant(variant, idx))
+                .collect();
+
+            check_unique_discriminants(name, &variants, &discriminants);
+
+            let arms: Vec<_> = variants
+                .iter()
+                .zip(&discriminants)
+                .map(|(variant, &discriminant)| {
                     encode::enum_encode_arm(
                         name,
-                        ident,
+                        &variant.ident,
                         &variant.fields,
                         discriminant,
                         krate,
@@ -116,18 +168,22 @@ fn build_decode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
             }
         }
         Data::Enum(e) => {
-            let variant_count = e.variants.len();
-
-            let arms: Vec<_> = e
-                .variants
+            let variants: Vec<&Variant> = e.variants.iter().collect();
+            let discriminants: Vec<u8> = variants
                 .iter()
                 .enumerate()
-                .map(|(idx, variant)| {
-                    let discriminant = idx as u8;
-                    let ident = &variant.ident;
+                .map(|(idx, variant)| variant_discriminant(variant, idx))
+                .collect();
+
+            check_unique_discriminants(name, &variants, &discriminants);
+
+            let arms: Vec<_> = variants
+                .iter()
+                .zip(&discriminants)
+                .map(|(variant, &discriminant)| {
                     decode::enum_decode_arm(
                         name,
-                        ident,
+                        &variant.ident,
                         &variant.fields,
                         discriminant,
                         krate,
@@ -140,10 +196,7 @@ fn build_decode_impl(input: &DeriveInput, krate: &TokenStream2, is_async: bool) 
                 let discriminant = <u8 as #krate::Decode>::decode(reader)#await_tok?;
                 match discriminant {
                     #(#arms),*,
-                    other => Err(#krate::Error::InvalidDiscriminant{got:
-                        other,
-                        max: #variant_count,
-                    }),
+                    other => Err(#krate::Error::InvalidDiscriminant(other)),
                 }
             }
         }

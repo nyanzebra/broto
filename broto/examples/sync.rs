@@ -10,7 +10,10 @@ struct Point {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 enum Shape {
-    Circle { radius: u32 },
+    Circle {
+        radius: u32,
+    },
+    #[tag(100)]
     Rectangle(u32, u32),
     Point(Point),
     Empty,
