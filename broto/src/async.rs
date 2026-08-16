@@ -40,8 +40,8 @@ pub trait DecodeExt: AsyncBufRead + Unpin {
     ///
     /// ```no_run
     /// # use futures::StreamExt;
-    /// # use broto::r#async::DecodeExt;
-    /// # async fn example<T: broto::r#async::Decode>(mut reader: impl DecodeExt) -> broto::Result<()> {
+    /// # use broto::DecodeExt;
+    /// # async fn example<T: broto::Decode>(mut reader: impl DecodeExt) -> broto::Result<()> {
     /// let mut messages = reader.messages::<T>();
     /// while let Some(message) = messages.next().await {
     ///     let message = message?;

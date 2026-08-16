@@ -38,8 +38,8 @@ pub trait DecodeExt: BufRead {
     ///
     /// ```no_run
     /// # use std::io::BufReader;
-    /// # use broto::sync::DecodeExt;
-    /// # fn example<T: broto::sync::Decode>(stream: std::net::TcpStream) -> broto::Result<()> {
+    /// # use broto::DecodeExt;
+    /// # fn example<T: broto::Decode>(stream: std::net::TcpStream) -> broto::Result<()> {
     /// let mut reader = BufReader::new(stream);
     /// for message in reader.messages::<T>() {
     ///     let message = message?;
