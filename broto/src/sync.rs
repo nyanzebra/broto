@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 
 pub use broto_derive::{Decode, Encode};
 
@@ -22,6 +22,68 @@ pub trait Decode {
         Self: Sized,
         R: Read;
 }
+
+/// Extension trait adding [`DecodeExt::messages`] to any [`BufRead`].
+pub trait DecodeExt: BufRead {
+    /// Iterates over successive `T`s decoded from this reader, ending
+    /// cleanly at end-of-stream, or short-circuiting with `Some(Err(_))`
+    /// on a decode failure (including a truncated final message) — the
+    /// iterator produces no further items after an `Err`.
+    ///
+    /// Each iteration peeks via [`BufRead::fill_buf`] before decoding: an
+    /// empty peek means a clean end-of-stream (`None`, iteration ends);
+    /// a non-empty peek means a message is expected, and running out of
+    /// bytes partway through it is a genuine [`Error`], never treated as
+    /// "no more messages."
+    ///
+    /// ```no_run
+    /// # use std::io::BufReader;
+    /// # use broto::DecodeExt;
+    /// # fn example<T: broto::Decode>(stream: std::net::TcpStream) -> broto::Result<()> {
+    /// let mut reader = BufReader::new(stream);
+    /// for message in reader.messages::<T>() {
+    ///     let message = message?;
+    ///     // handle message
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn messages<T>(&mut self) -> impl Iterator<Item = Result<T>> + '_
+    where
+        T: Decode,
+        Self: Sized,
+    {
+        let mut done = false;
+        std::iter::from_fn(move || {
+            if done {
+                return None;
+            }
+
+            let peek = match self.fill_buf() {
+                Ok(peek) => peek,
+                Err(err) => {
+                    done = true;
+                    return Some(Err(err.into()));
+                }
+            };
+
+            if peek.is_empty() {
+                done = true;
+                return None;
+            }
+
+            match T::decode(self) {
+                Ok(value) => Some(Ok(value)),
+                Err(err) => {
+                    done = true;
+                    Some(Err(err))
+                }
+            }
+        })
+    }
+}
+
+impl<R> DecodeExt for R where R: BufRead {}
 
 mod unit {
 

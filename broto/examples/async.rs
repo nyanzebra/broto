@@ -5,9 +5,8 @@
 //! runtime's I/O types work the same way as long as they implement the
 //! `futures_io` traits (tokio types need `tokio_util::compat` to bridge).
 
-use broto::{Decode, Encode};
-use futures::executor::block_on;
-use futures::io::Cursor;
+use broto::{Decode, DecodeExt as _, Encode};
+use futures::{StreamExt as _, executor::block_on, io::Cursor};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Point {
@@ -47,8 +46,9 @@ async fn run() -> broto::Result<()> {
 
     let mut reader = Cursor::new(bytes);
     let mut decoded = Vec::new();
-    for _ in 0..shapes.len() {
-        decoded.push(Shape::decode(&mut reader).await?);
+    let mut messages = reader.messages::<Shape>();
+    while let Some(message) = messages.next().await {
+        decoded.push(message?);
     }
 
     assert_eq!(shapes, decoded);

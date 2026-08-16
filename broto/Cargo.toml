@@ -14,6 +14,7 @@ required-features = ["async"]
 
 [dependencies]
 broto-derive = { path = "../broto-derive" }
+futures = { workspace = true, optional = true }
 futures-io = { workspace = true, optional = true }
 futures-util = { workspace = true, features = ["io"], optional = true }
 thiserror = { workspace = true }
@@ -23,5 +24,5 @@ futures = "0.3"
 
 [features]
 default = []
-async = ["broto-derive/async", "dep:futures-io", "dep:futures-util"]
+async = ["broto-derive/async", "dep:futures-io", "dep:futures-util", "dep:futures"]
 sync = ["broto-derive/sync"]

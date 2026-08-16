@@ -16,6 +16,7 @@ edition = "2024"
 repository = "https://github.com/nyanzebra/broto"
 
 [workspace.dependencies]
+futures = { version = "0.3" }
 futures-io = { version = "0.3" }
 futures-util = { version = "0.3" }
 proc-macro2 = "1"
