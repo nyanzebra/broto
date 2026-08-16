@@ -1,6 +1,8 @@
 pub use broto_derive::{Decode, Encode};
 
-pub use futures_io::{AsyncRead, AsyncWrite};
+use futures::{AsyncBufReadExt as _, Stream};
+// Need to re-export for derives.
+pub use futures_io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 use crate::Result;
 
@@ -22,6 +24,58 @@ pub trait Decode {
         Self: Sized,
         R: AsyncRead + Unpin;
 }
+
+/// Extension trait adding [`DecodeExt::messages`] to any [`AsyncBufRead`].
+pub trait DecodeExt: AsyncBufRead + Unpin {
+    /// Streams successive `T`s decoded from this reader, ending cleanly at
+    /// end-of-stream, or short-circuiting with `Some(Err(_))` on a decode
+    /// failure (including a truncated final message) — the stream produces
+    /// no further items after an `Err`.
+    ///
+    /// Each iteration peeks via [`AsyncBufReadExt::fill_buf`] before
+    /// decoding: an empty peek means a clean end-of-stream (stream ends);
+    /// a non-empty peek means a message is expected, and running out of
+    /// bytes partway through it is a genuine [`Error`], never treated as
+    /// "no more messages."
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use broto::r#async::DecodeExt;
+    /// # async fn example<T: broto::r#async::Decode>(mut reader: impl DecodeExt) -> broto::Result<()> {
+    /// let mut messages = reader.messages::<T>();
+    /// while let Some(message) = messages.next().await {
+    ///     let message = message?;
+    ///     // handle message
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn messages<T>(&mut self) -> std::pin::Pin<Box<dyn Stream<Item = Result<T>> + '_>>
+    where
+        T: Decode,
+        Self: Sized,
+    {
+        Box::pin(futures::stream::unfold(Some(self), |state| async move {
+            let reader = state?;
+
+            let peek = match reader.fill_buf().await {
+                Ok(peek) => peek,
+                Err(err) => return Some((Err(err.into()), None)),
+            };
+
+            if peek.is_empty() {
+                return None;
+            }
+
+            match T::decode(reader).await {
+                Ok(value) => Some((Ok(value), Some(reader))),
+                Err(err) => Some((Err(err), None)),
+            }
+        }))
+    }
+}
+
+impl<R> DecodeExt for R where R: AsyncBufRead + Unpin {}
 
 mod unit {
 

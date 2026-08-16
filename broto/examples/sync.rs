@@ -1,6 +1,6 @@
 //! Run with: cargo run --example sync_roundtrip --features sync
 
-use broto::{Decode, Encode};
+use broto::{Decode, DecodeExt as _, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Point {
@@ -37,8 +37,8 @@ fn main() -> broto::Result<()> {
     // Decode: &[u8] implements std::io::Read.
     let mut cursor: &[u8] = &buf;
     let mut decoded = Vec::new();
-    for _ in 0..shapes.len() {
-        decoded.push(Shape::decode(&mut cursor)?);
+    for msg in cursor.messages::<Shape>() {
+        decoded.push(msg?);
     }
 
     assert_eq!(shapes, decoded);
